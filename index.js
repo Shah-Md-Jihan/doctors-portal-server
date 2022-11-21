@@ -3,7 +3,7 @@ const cors = require("cors");
 require("dotenv").config();
 const jwt = require("jsonwebtoken");
 
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 5000;
 
 const app = express();
@@ -56,9 +56,8 @@ async function run() {
     // email wise booking api
     app.get("/bookings", verifyJWT, async (req, res) => {
       const email = req.query.email;
-      // console.log(email);
+
       const decodedEmail = req.decoded.email;
-      console.log(decodedEmail);
 
       if (email !== decodedEmail) {
         return res.status(403).send({ message: "forbidden access" });
@@ -102,6 +101,46 @@ async function run() {
     app.post("/users", async (req, res) => {
       const user = req.body;
       const result = await usersCollection.insertOne(user);
+      res.send(result);
+    });
+
+    // check admin api
+    app.get("/users/admin/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+      res.send({ isAdmin: user?.role === "admin" });
+    });
+
+    // allUsers Api
+    app.get("/users", async (req, res) => {
+      const query = {};
+      const users = await usersCollection.find(query).toArray();
+      res.send(users);
+    });
+
+    // make admin api
+    app.put("/users/admin/:id", verifyJWT, async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      console.log(decodedEmail);
+      const query = { email: decodedEmail };
+
+      const user = await usersCollection.findOne(query);
+
+      if (user?.role !== "admin") {
+        console.log("not admin");
+        return res.status(403).send({ message: "forbidden access!" });
+      }
+
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const options = { upsert: true };
+      const updatedDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updatedDoc, options);
       res.send(result);
     });
   } finally {
