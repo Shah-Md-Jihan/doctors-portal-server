@@ -1,5 +1,7 @@
 const express = require("express");
 const cors = require("cors");
+const nodemailer = require("nodemailer");
+const mg = require("nodemailer-mailgun-transport");
 require("dotenv").config();
 
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
@@ -17,6 +19,50 @@ app.use(express.json());
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.mfyq6m8.mongodb.net/?retryWrites=true&w=majority`;
 
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
+
+function sendBookingEmail(booking) {
+  const auth = {
+    auth: {
+      api_key: process.env.EMAIL_SEND_API_KEY,
+      domain: process.env.EMAIL_SEND_DOMAIN,
+    },
+  };
+
+  const transporter = nodemailer.createTransport(mg(auth));
+  const { email, treatment, date, slot } = booking;
+  //  nodemailer code is commented out
+
+  // const { email, treatment, appointmentDate, slot } = booking;
+  // let transporter = nodemailer.createTransport({
+  //   host: "smtp.sendgrid.net",
+  //   port: 587,
+  //   auth: {
+  //     user: "apikey",
+  //     pass: process.env.SENDGRID_API_KEY,
+  //   },
+  // });
+  transporter.sendMail(
+    {
+      from: "shahmohammadjihan@gmail.com", // verified sender email
+      to: email, // recipient email
+      subject: `Your appointment for ${treatment} is confirmed.`, // Subject line
+      text: "Hello world!", // plain text body
+      html: `
+      <h1>Your appointment is confirmed!</h1>
+      <p>You want to take treatment ${treatment} on ${date} at ${slot}</p>
+
+      <p>Thanks from Doctor's portal.</p>
+      `, // html body
+    },
+    function (error, info) {
+      if (error) {
+        console.log(error);
+      } else {
+        console.log("Email sent: " + info.response);
+      }
+    }
+  );
+}
 
 function verifyJWT(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -99,6 +145,7 @@ async function run() {
         return res.send({ acknowledged: false, message });
       }
       const result = await bookingsCollection.insertOne(booking);
+      sendBookingEmail(booking);
       res.send(result);
     });
 
